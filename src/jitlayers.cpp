@@ -9,6 +9,7 @@
 template <class T>
 static void addOptimizationPasses(T *PM)
 {
+    PM->add(createLowerGCFramePass(tbaa_gcframe));
 #ifdef JL_DEBUG_BUILD
     PM->add(createVerifierPass());
 #endif
