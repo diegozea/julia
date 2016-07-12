@@ -975,6 +975,7 @@ static void jl_setup_module(Module *m)
 static void jl_finalize_module(std::unique_ptr<Module> uniquem, bool shadow)
 {
     Module *m = uniquem.release(); // unique_ptr won't be able track what we do with this (the invariant is recovered by jl_finalize_function)
+    jl_safe_printf("%s\n", __func__);
 #if !defined(USE_ORCJIT)
     PM->run(*m);
 #endif
@@ -1156,6 +1157,7 @@ void *jl_get_llvmf(jl_tupletype_t *tt, bool getwrapper, bool getdeclarations)
         Function *f, *specf;
         jl_llvm_functions_t declarations;
         std::unique_ptr<Module> m = emit_function(temp ? temp : linfo, &declarations);
+        jl_safe_printf("%s\n", __func__);
         PM->run(*m.get());
         f = (llvm::Function*)declarations.functionObject;
         specf = (llvm::Function*)declarations.specFunctionObject;
@@ -4939,6 +4941,15 @@ extern "C" void jl_fptr_to_llvm(jl_fptr_t fptr, jl_lambda_info_t *lam, int specs
 
 static void init_julia_llvm_env(Module *m)
 {
+    install_fatal_error_handler(
+        [] (void *user_data, const std::string& reason,
+            bool gen_crash_diag) {
+            jl_ptls_t ptls = jl_get_ptls_states();
+            jl_safe_printf("%s\n", reason.c_str());
+            ptls->bt_size = rec_backtrace(ptls->bt_data, JL_MAX_BT_SIZE);
+            jl_critical_error(0, NULL, ptls->bt_data, &ptls->bt_size);
+            abort();
+        });
     MDNode *tbaa_root = mbuilder->createTBAARoot("jtbaa");
     tbaa_gcframe = tbaa_make_child("jtbaa_gcframe", tbaa_root);
     tbaa_stack = tbaa_make_child("jtbaa_stack", tbaa_root);
